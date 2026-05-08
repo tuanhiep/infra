@@ -22,7 +22,6 @@
     <modules>
         <module>brick/circuit-breaker</module>
         <module>brick/rate-limiter</module>
-        <module>principal-engineering/graceful-degradation</module>
     </modules>
 
     <properties>
