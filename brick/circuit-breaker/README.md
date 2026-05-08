@@ -31,6 +31,36 @@ The service boundary must protect the caller, avoid increasing pressure on a fai
 
 ## Runtime Flow
 
+```mermaid
+flowchart TD
+    caller[HTTP client] --> controller[PaymentQuoteController]
+    controller --> service[PaymentQuoteService<br/>domain fallback owner]
+
+    service --> breaker{Resilience4j<br/>CircuitBreaker}
+    breaker -->|CLOSED or HALF_OPEN| timeout[Timeout-bounded<br/>remote call]
+    timeout --> gateway[RemotePaymentGatewayClient<br/>simulated payment gateway]
+
+    gateway -->|success| live[Live quote]
+    live --> cache[(Last-known-good cache<br/>TTL by currency)]
+    live --> response[PaymentQuoteResponse<br/>degraded=false]
+
+    gateway -->|RemotePaymentGatewayException<br/>or timeout| fallback{Fallback strategy}
+    breaker -->|OPEN<br/>CallNotPermittedException| fallback
+
+    fallback -->|fresh entry exists| cached[Cached quote<br/>source=CACHE]
+    fallback -->|no fresh cache| conservative[Conservative default<br/>source=CONSERVATIVE_DEFAULT]
+    cached --> degraded[PaymentQuoteResponse<br/>degraded=true]
+    conservative --> degraded
+
+    service -->|BusinessRuleException| business[Propagate HTTP 400<br/>not counted by breaker]
+    service -->|programming/config error| failclosed[Propagate fail-closed<br/>not converted to fallback]
+
+    degraded --> controller
+    response --> controller
+    business --> controller
+    failclosed --> controller
+```
+
 ```text
 HTTP request
   -> PaymentQuoteController
