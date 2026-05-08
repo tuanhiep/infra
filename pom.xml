@@ -12,7 +12,7 @@
     </parent>
 
     <groupId>com.tuanhiep</groupId>
-    <artifactId>autopsy-of-distributed-systems</artifactId>
+    <artifactId>infra</artifactId>
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
@@ -20,6 +20,7 @@
     <description>Executable architecture case studies for distributed systems and principal engineering.</description>
 
     <modules>
+        <module>brick/spring-boot-service</module>
         <module>system-design/rate-limiter</module>
         <module>principal-engineering/graceful-degradation</module>
     </modules>
@@ -28,4 +29,3 @@
         <java.version>21</java.version>
     </properties>
 </project>
-

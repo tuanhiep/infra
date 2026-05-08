@@ -2,8 +2,9 @@
 
 Executable case studies in distributed systems, backend architecture, and principal engineering trade-offs.
 
-This repository is the code artifact layer for two blog tracks:
+This repository is the code artifact layer for three tracks:
 
+- `brick/`: reusable code bricks for system design case studies.
 - `system-design/`: runnable Spring Boot case studies for distributed systems mechanics.
 - `principal-engineering/`: runnable architecture cases focused on judgment, trade-offs, and operating constraints.
 
@@ -17,6 +18,8 @@ This repository is the code artifact layer for two blog tracks:
 
 ```text
 autopsy-of-distributed-systems/
+  brick/
+    spring-boot-service/
   system-design/
     rate-limiter/
   principal-engineering/
@@ -24,4 +27,3 @@ autopsy-of-distributed-systems/
 ```
 
 Each module starts small on purpose: code first, then README, ADRs, tests, benchmarks, and blog links as the series grows.
-
