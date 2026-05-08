@@ -14,6 +14,9 @@ public record CircuitBreakerProperties(
         int permittedCallsInHalfOpenState,
         Duration waitDurationInOpenState,
         Duration remoteCallTimeout,
-        Duration fallbackCacheTtl
+        Duration fallbackCacheTtl,
+        String baseUrl,
+        Duration connectTimeout,
+        Duration readTimeout
 ) {
 }

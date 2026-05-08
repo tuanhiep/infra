@@ -6,7 +6,7 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
   endpoint:
     health:
       probes:
@@ -25,3 +25,6 @@ infra:
       wait-duration-in-open-state: 10s
       remote-call-timeout: 300ms
       fallback-cache-ttl: 5m
+      base-url: http://localhost:9090
+      connect-timeout: 200ms
+      read-timeout: 250ms

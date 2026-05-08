@@ -1,5 +1,6 @@
 package infra.brick.circuitbreaker.payment;
 
+import infra.brick.circuitbreaker.config.CircuitBreakerProperties;
 import io.github.resilience4j.circuitbreaker.CallNotPermittedException;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import java.time.Duration;
@@ -25,7 +26,7 @@ public class PaymentQuoteService {
             FallbackQuoteCache fallbackCache,
             CircuitBreaker circuitBreaker,
             ExecutorService remoteCallExecutor,
-            infra.brick.circuitbreaker.config.CircuitBreakerProperties properties
+            CircuitBreakerProperties properties
     ) {
         this.remoteClient = remoteClient;
         this.fallbackCache = fallbackCache;

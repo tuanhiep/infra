@@ -261,7 +261,10 @@ class PaymentQuoteServiceTest {
                 1,
                 Duration.ofMinutes(1),
                 remoteCallTimeout,
-                fallbackCacheTtl
+                fallbackCacheTtl,
+                "http://localhost:9090",
+                Duration.ofMillis(100),
+                Duration.ofMillis(200)
         );
     }
 

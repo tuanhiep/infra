@@ -2,7 +2,7 @@
 
 Track: `brick`
 
-Canonical Spring Boot brick for protecting an outbound dependency with Resilience4j CircuitBreaker. The demo models a payment quote service calling an unreliable payment gateway.
+Canonical Spring Boot brick for protecting an outbound HTTP dependency with Resilience4j CircuitBreaker. The demo models a payment quote service calling a configurable payment gateway over Spring `RestClient`.
 
 The bar for this module is evidence, not labels: every operational claim below is either implemented in code, covered by tests, or explicitly listed as a production gap.
 
@@ -27,6 +27,8 @@ The service boundary must protect the caller, avoid increasing pressure on a fai
 - An `OPEN` circuit skips the remote call and increments not-permitted-call metrics.
 - Every fallback response sets `degraded=true` and a concrete `QuoteSource`.
 - Last-known-good fallback entries expire by TTL.
+- The gateway client uses real HTTP connect/read timeouts plus a service-level timeout budget.
+- Circuit breaker health and Micrometer/Prometheus metrics are implemented, not just documented.
 - The README does not claim endpoints, metrics, or behavior that are not present in code.
 
 ## Runtime Flow
@@ -37,14 +39,15 @@ flowchart TD
     controller --> service[PaymentQuoteService<br/>domain fallback owner]
 
     service --> breaker{Resilience4j<br/>CircuitBreaker}
-    breaker -->|CLOSED or HALF_OPEN| timeout[Timeout-bounded<br/>remote call]
-    timeout --> gateway[RemotePaymentGatewayClient<br/>simulated payment gateway]
+    breaker -->|CLOSED or HALF_OPEN| timeout[Timeout-bounded<br/>HTTP call]
+    timeout --> gateway[HttpPaymentGatewayClient<br/>Spring RestClient]
+    gateway --> upstream[Payment gateway<br/>configurable base URL]
 
-    gateway -->|success| live[Live quote]
+    upstream -->|success| live[Live quote]
     live --> cache[(Last-known-good cache<br/>TTL by currency)]
     live --> response[PaymentQuoteResponse<br/>degraded=false]
 
-    gateway -->|RemotePaymentGatewayException<br/>or timeout| fallback{Fallback strategy}
+    upstream -->|5xx, network error<br/>or timeout| fallback{Fallback strategy}
     breaker -->|OPEN<br/>CallNotPermittedException| fallback
 
     fallback -->|fresh entry exists| cached[Cached quote<br/>source=CACHE]
@@ -64,10 +67,11 @@ flowchart TD
 ```text
 HTTP request
   -> PaymentQuoteController
-  -> PaymentQuoteService
+       -> PaymentQuoteService
        -> Resilience4j CircuitBreaker
-       -> timeout-bounded remote call
-       -> RemotePaymentGatewayClient
+       -> timeout-bounded HTTP call
+       -> HttpPaymentGatewayClient
+       -> configurable payment gateway base URL
             success: cache last-known-good quote
             RemotePaymentGatewayException: fallback
             CallNotPermittedException: fallback without remote call
@@ -106,11 +110,15 @@ curl "http://localhost:8080/api/payment-quotes?amount=100.00&currency=USD"
 curl "http://localhost:8080/api/circuit-breaker/payment-gateway"
 curl "http://localhost:8080/actuator/health"
 curl "http://localhost:8080/actuator/metrics"
+curl "http://localhost:8080/actuator/metrics/resilience4j.circuitbreaker.buffered.calls"
+curl "http://localhost:8080/actuator/prometheus"
 ```
 
 `/api/circuit-breaker/payment-gateway` is implemented by the application and returns breaker name, state, failure rate, slow-call rate, buffered calls, failed calls, and not-permitted calls.
 
-Actuator `health`, `info`, and generic `metrics` are exposed by configuration. This module does not implement Prometheus export, OpenTelemetry export, dashboards, or alert rules.
+Actuator `health`, `info`, `metrics`, and `prometheus` are exposed by configuration. The `paymentGateway` health contributor reports `OUT_OF_SERVICE` when the circuit is `OPEN`; otherwise it reports `UP` with breaker details. Custom Micrometer gauges export breaker failure rate, slow-call rate, buffered calls, failed calls, not-permitted calls, and state.
+
+OpenTelemetry export, dashboards, and alert rules are recommended production follow-ups, not implemented here.
 
 ## Configuration
 
@@ -128,6 +136,9 @@ infra:
       wait-duration-in-open-state: 10s
       remote-call-timeout: 300ms
       fallback-cache-ttl: 5m
+      base-url: http://localhost:9090
+      connect-timeout: 200ms
+      read-timeout: 250ms
 ```
 
 Rationale:
@@ -135,8 +146,10 @@ Rationale:
 - Count-based windows keep the demo and tests deterministic.
 - `minimum-number-of-calls` avoids opening the breaker on a single unlucky request.
 - `failure-rate-threshold` and `slow-call-rate-threshold` are separate because a successful but slow dependency can still harm the caller.
-- `remote-call-timeout` converts an overdue gateway call into a downstream failure.
+- `connect-timeout` and `read-timeout` belong to the HTTP client; they keep socket behavior bounded.
+- `remote-call-timeout` is the service-level budget around the entire protected dependency call.
 - `fallback-cache-ttl` prevents stale payment quotes from living forever.
+- `base-url` makes the gateway replaceable in tests and environments.
 
 ## Test Matrix
 
@@ -152,6 +165,16 @@ Covered by `PaymentQuoteServiceTest`:
 - timeout is treated as downstream failure and falls back;
 - slow successful calls can open the circuit when the slow-call threshold is reached.
 
+Covered by `PaymentQuoteIntegrationTest`:
+
+- the API calls a real HTTP gateway through Spring `RestClient`;
+- breaker state endpoint returns live state after an HTTP-backed quote;
+- Actuator health includes the `paymentGateway` contributor;
+- Micrometer metrics are available through `/actuator/metrics`;
+- Prometheus export is available through `/actuator/prometheus`;
+- when the upstream returns 503 enough times to open the circuit, health becomes `OUT_OF_SERVICE`;
+- after the circuit opens, additional requests do not call the upstream again.
+
 `CircuitBreakerApplicationTests` verifies Spring context wiring.
 
 ## Operational Notes
@@ -160,12 +183,13 @@ Covered by `PaymentQuoteServiceTest`:
 - Tune thresholds from production traffic volume, upstream latency distribution, and tolerance for stale/default quotes.
 - Add retries only when the operation is idempotent and retry budgets are explicit.
 - Add bulkheads or connection-pool isolation before using this pattern on high-volume blocking I/O.
+- Protect Actuator endpoints with authentication/authorization before exposing this outside a local environment.
 - Decide whether conservative defaults are legally and financially acceptable for the specific payment domain before enabling them in production.
 
 ## Production Gaps
 
-- The gateway client is simulated. A real service should use a real HTTP client with connect/read/socket timeouts.
-- The executor timeout cancels a `Future`, but a blocking client must also honor interruption or enforce its own timeout.
+- The gateway contract is intentionally small: `GET /quotes` returns `networkFee` and `reason`. Real systems need schema/versioning, auth, TLS, and error-body mapping.
+- The executor timeout cancels a `Future`; the HTTP client also has connect/read timeouts, but high-volume production traffic should still add bulkhead or connection pool isolation.
 - The fallback cache is in-memory only. Multi-instance deployments need an explicit consistency strategy.
-- Resilience4j metrics are visible through the local breaker snapshot, but they are not exported to Prometheus or OpenTelemetry in this module.
-- Alert thresholds, dashboards, runbooks, and SLO-based tuning are recommended for production but intentionally not claimed as implemented here.
+- Prometheus metrics are exported, but alert thresholds, dashboards, runbooks, and SLO-based tuning are intentionally not implemented here.
+- OpenTelemetry export and distributed tracing are not implemented.
