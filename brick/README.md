@@ -6,5 +6,4 @@ These modules are intentionally small and canonical. They provide clean starting
 
 ## Modules
 
-- `spring-boot-service/`: baseline Spring Boot service brick.
-
+- `circuit-breaker/`: canonical Spring Boot circuit breaker brick for protecting outbound dependencies.

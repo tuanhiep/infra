@@ -23,3 +23,5 @@ infra:
       minimum-number-of-calls: 5
       permitted-calls-in-half-open-state: 3
       wait-duration-in-open-state: 10s
+      remote-call-timeout: 300ms
+      fallback-cache-ttl: 5m

@@ -3,3 +3,10 @@
 target/
 .DS_Store
 
+# Local Vietnamese study notes. Keep public module docs as README.md.
+/brick/*/*.md
+!/brick/*/README.md
+/system-design/*/*.md
+!/system-design/*/README.md
+/principal-engineering/*/*.md
+!/principal-engineering/*/README.md

@@ -12,18 +12,25 @@ This repository is the code artifact layer for three tracks:
 
 - Java 21
 - Spring Boot 4.0.6
-- Maven multi-module project
+- Maven Wrapper 3.9.9
+- Maven multi-module project with dependency and plugin governance in the root POM
 
 ## Structure
 
 ```text
 infra/
   brick/
-    spring-boot-service/
+    circuit-breaker/
   system-design/
     rate-limiter/
   principal-engineering/
     graceful-degradation/
 ```
 
-Each module starts small on purpose: code first, then README, ADRs, tests, benchmarks, and blog links as the series grows.
+## Build
+
+```bash
+./mvnw clean test
+```
+
+The root build enforces the Java/Maven baseline and dependency convergence. Each public module keeps an English `README.md`; local Vietnamese study notes use `<module>.md` and are ignored by Git.
