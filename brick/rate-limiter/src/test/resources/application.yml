@@ -1,0 +1,12 @@
+infra:
+  brick:
+    rate-limiter:
+      name: "api"
+      limit-for-period: 5
+      limit-refresh-period: 1m
+      timeout-duration: 0
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
