@@ -16,7 +16,7 @@
     <version>0.0.1-SNAPSHOT</version>
     <packaging>pom</packaging>
 
-    <name>autopsy-of-distributed-systems</name>
+    <name>infra</name>
     <description>Executable architecture case studies for distributed systems and principal engineering.</description>
 
     <modules>

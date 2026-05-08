@@ -1,4 +1,4 @@
-# Autopsy of Distributed Systems
+# Infra
 
 Executable case studies in distributed systems, backend architecture, and principal engineering trade-offs.
 
@@ -17,7 +17,7 @@ This repository is the code artifact layer for three tracks:
 ## Structure
 
 ```text
-autopsy-of-distributed-systems/
+infra/
   brick/
     spring-boot-service/
   system-design/
