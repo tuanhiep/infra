@@ -1,43 +1,70 @@
 package infra.brick.ratelimiter;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatusCode;
+import org.springframework.web.client.RestClient;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-@SpringBootTest
-@AutoConfigureMockMvc
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class RateLimiterIntegrationTest {
 
-    @Autowired
-    private MockMvc mockMvc;
+    @LocalServerPort
+    private int port;
 
     @Test
-    void shouldAllowRequestWhenPermissionIsAvailable() throws Exception {
-        mockMvc.perform(get("/api/time"))
-            .andExpect(status().isOk());
+    void shouldAllowRequestWhenPermissionIsAvailable() {
+        Response response = get("/api/time", "client-allow");
+
+        assertThat(response.status().value()).isEqualTo(200);
+        assertThat(response.headers().getFirst("X-RateLimit-Limit")).isEqualTo("5");
+        assertThat(response.headers().getFirst("X-RateLimit-Remaining")).isEqualTo("4");
     }
 
     @Test
-    void shouldDenyRequestWhenPermissionIsNotAvailable() throws Exception {
-        // First 5 requests should be allowed
+    void shouldDenyRequestWhenPermissionIsNotAvailable() {
         for (int i = 0; i < 5; i++) {
-            mockMvc.perform(get("/api/time"))
-                .andExpect(status().isOk());
+            assertThat(get("/api/time", "client-a").status().value()).isEqualTo(200);
         }
 
-        // The 6th request should be denied
-        mockMvc.perform(get("/api/time"))
-            .andExpect(status().isTooManyRequests());
+        Response response = get("/api/time", "client-a");
+
+        assertThat(response.status().value()).isEqualTo(429);
+        assertThat(response.headers().getFirst("X-RateLimit-Limit")).isEqualTo("5");
+        assertThat(response.headers().getFirst("X-RateLimit-Remaining")).isEqualTo("0");
+        assertThat(response.headers().getFirst("X-RateLimit-Reset")).isNotBlank();
     }
 
     @Test
-    void shouldExposeMetrics() throws Exception {
-        mockMvc.perform(get("/actuator/metrics/resilience4j.ratelimiter.available.permissions"))
-            .andExpect(status().isOk());
+    void shouldIsolateLimitsPerClient() {
+        for (int i = 0; i < 5; i++) {
+            assertThat(get("/api/time", "client-b").status().value()).isEqualTo(200);
+        }
+
+        Response response = get("/api/time", "client-c");
+
+        assertThat(response.status().value()).isEqualTo(200);
+        assertThat(response.headers().getFirst("X-RateLimit-Remaining")).isEqualTo("4");
     }
+
+    @Test
+    void shouldExposeMetrics() {
+        assertThat(get("/actuator/metrics/rate.limiter.active.buckets", "metrics-client").status().value())
+                .isEqualTo(200);
+        assertThat(get("/actuator/metrics/rate.limiter.allowed.requests", "metrics-client").status().value())
+                .isEqualTo(200);
+    }
+
+    private Response get(String path, String clientId) {
+        RestClient client = RestClient.create("http://localhost:" + port);
+        return client.get()
+                .uri(path)
+                .header("X-Api-Key", clientId)
+                .exchange((request, response) -> new Response(response.getStatusCode(), response.getHeaders()));
+    }
+
+    private record Response(HttpStatusCode status, HttpHeaders headers) {}
 }

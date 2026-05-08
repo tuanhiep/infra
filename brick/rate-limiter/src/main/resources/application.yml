@@ -7,8 +7,9 @@ infra:
       refill-period: 1m
       bucket-ttl: 10m
       client-id-header: "X-Api-Key"
+
 management:
   endpoints:
     web:
       exposure:
-        include: "*"
+        include: "health,info,metrics"

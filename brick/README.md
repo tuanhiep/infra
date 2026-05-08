@@ -7,3 +7,4 @@ These modules are intentionally small and canonical. They provide clean starting
 ## Modules
 
 - `circuit-breaker/`: canonical Spring Boot circuit breaker brick for protecting outbound dependencies.
+- `rate-limiter/`: canonical Spring Boot token-bucket limiter for admission control.
