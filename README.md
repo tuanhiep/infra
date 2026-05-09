@@ -35,3 +35,11 @@ infra/
 ```
 
 The root build enforces the Java/Maven baseline and dependency convergence. Each public module keeps an English `README.md`; local Vietnamese study notes use `<module>.md` and are ignored by Git.
+
+## Validation
+
+Run the relevant module tests before treating a pattern as reusable. Each pattern should include the failure mode it handles and the behavior it guarantees.
+
+## Engineering Notes
+
+This repo should stay focused on executable architecture patterns: clear constraints, explicit trade-offs, and small services that demonstrate one concept well.
