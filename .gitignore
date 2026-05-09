@@ -1,6 +1,7 @@
 .idea/
 *.iml
 target/
+**/target/
 .DS_Store
 
 # Local Vietnamese study notes. Keep public module docs as README.md.

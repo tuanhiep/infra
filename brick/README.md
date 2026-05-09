@@ -6,5 +6,6 @@ These modules are intentionally small and canonical. They provide clean starting
 
 ## Modules
 
+- `cdn-edge-cache/`: canonical Spring Boot Origin plus Nginx Edge cache brick for CDN mechanics.
 - `circuit-breaker/`: canonical Spring Boot circuit breaker brick for protecting outbound dependencies.
 - `rate-limiter/`: canonical Spring Boot token-bucket limiter for admission control.

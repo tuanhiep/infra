@@ -20,6 +20,7 @@
     <description>Executable architecture case studies for distributed systems and principal engineering.</description>
 
     <modules>
+        <module>brick/cdn-edge-cache</module>
         <module>brick/circuit-breaker</module>
         <module>brick/rate-limiter</module>
     </modules>
