@@ -20,10 +20,11 @@ This repository is the code artifact layer for three tracks:
 ```text
 infra/
   brick/
+    cdn-edge-cache/
     circuit-breaker/
     rate-limiter/
   system-design/
-    README.md
+    idempotent-payment-ledger/
   principal-engineering/
     README.md
 ```

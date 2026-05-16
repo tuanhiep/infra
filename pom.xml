@@ -23,6 +23,7 @@
         <module>brick/cdn-edge-cache</module>
         <module>brick/circuit-breaker</module>
         <module>brick/rate-limiter</module>
+        <module>system-design/idempotent-payment-ledger</module>
     </modules>
 
     <properties>

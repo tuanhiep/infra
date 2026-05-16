@@ -1,8 +1,7 @@
 # System Design
 
-Runnable case studies for distributed systems mechanics.
+Runnable Spring Boot modules for distributed systems mechanics and architecture trade-offs.
 
 ## Modules
 
-- `rate-limiter/`: starter module for rate limiting design.
-
+- `idempotent-payment-ledger/`: retry-safe payment intake with idempotency keys and balanced ledger entries.
