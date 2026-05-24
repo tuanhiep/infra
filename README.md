@@ -22,6 +22,7 @@ infra/
     rate-limiter/
   system-design/
     idempotent-payment-ledger/
+    llm-backpressure-lab/
   principal-engineering/
     README.md
 ```
@@ -43,6 +44,7 @@ Runnable case studies that combine multiple infrastructure concerns into a coher
 | Module | Focus | Current maturity |
 |---|---|---|
 | `system-design/idempotent-payment-ledger` | Retry-safe payment intake, idempotency keys, payload hashing, duplicate replay, conflict detection, balanced debit/credit ledger entries | Strong first slice; correctness invariants are clear and tested; next serious step is durable transaction boundary with Postgres-style persistence, ledger posting rules, outbox, reconciliation, and domain metrics. |
+| `system-design/llm-backpressure-lab` | Local lab for isolating slow/flaky LLM dependencies with a Mock LLM, planned async outbox/Kafka workers, DLQ, backpressure, and before/after load evidence | New first slice; proof contract, Mock LLM, tests, and Docker skeleton exist; remaining work is core API, Kafka worker path, k6, Prometheus/Grafana, ADRs, and before/after evidence. |
 
 ### `principal-engineering/`
 

@@ -3,4 +3,8 @@
 **/target/
 .DS_Store
 .local/
-
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/

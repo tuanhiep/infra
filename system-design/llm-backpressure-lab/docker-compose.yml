@@ -1,0 +1,18 @@
+services:
+  mock-llm:
+    build:
+      context: ./services/mock-llm
+    environment:
+      MOCK_LLM_PORT: "8088"
+      MOCK_LLM_MIN_LATENCY_MS: "2000"
+      MOCK_LLM_MAX_LATENCY_MS: "5000"
+      MOCK_LLM_RATE_LIMIT_PERCENT: "10"
+      MOCK_LLM_ERROR_PERCENT: "5"
+      MOCK_LLM_TIMEOUT_PERCENT: "5"
+    ports:
+      - "8088:8088"
+    deploy:
+      resources:
+        limits:
+          cpus: "0.10"
+          memory: 128M
