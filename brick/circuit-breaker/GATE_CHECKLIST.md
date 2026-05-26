@@ -47,10 +47,10 @@
 - [ ] Bulkhead for thread isolation implemented.
 - [ ] Distributed cache consistency addressed.
 
-## Narrative
+## Engineering Communication
 
 - [x] README exists.
 - [x] Design doc exists.
 - [x] Engineering narrative exists.
-- [ ] CV bullet drafted.
-- [ ] Interview-ready 3-minute story rehearsed.
+- [ ] Key design trade-offs are summarized for design review.
+- [ ] Production gaps are explicitly documented with next steps.

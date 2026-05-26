@@ -41,9 +41,10 @@
 - [ ] Stale fallback on Origin failure is configured.
 - [ ] Cache poisoning vectors are addressed.
 
-## Narrative
+## Engineering Communication
 
 - [x] README exists.
 - [x] Design doc exists.
 - [x] Engineering narrative exists.
-- [ ] Interview-ready 3-minute story is rehearsed.
+- [ ] Key design trade-offs are summarized for design review.
+- [ ] Production gaps are explicitly documented with next steps.

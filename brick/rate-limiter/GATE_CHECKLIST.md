@@ -42,10 +42,10 @@
 - [ ] Race condition in tryConsume is verified.
 - [ ] Clock skew handling is documented.
 
-## Narrative
+## Engineering Communication
 
 - [x] README exists.
 - [x] Design doc exists.
 - [x] Engineering narrative exists.
-- [ ] Algorithm comparison story rehearsed.
+- [ ] Algorithm comparison and trade-offs are documented.
 - [ ] Distributed extension design documented.
