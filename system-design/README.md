@@ -1,8 +1,17 @@
 # System Design
 
-Runnable Spring Boot modules for distributed systems mechanics and architecture trade-offs.
+Runnable modules for distributed-systems mechanics, explicit consistency boundaries, and
+failure-oriented architecture trade-offs.
 
-## Modules
+## Completed Case Study
 
-- `idempotent-payment-ledger/`: retry-safe payment intake with idempotency keys and balanced ledger entries.
-- `llm-backpressure-lab/`: local AI dependency resilience lab for LLM latency isolation, failure injection, bounded async processing, and backpressure evidence.
+### [Idempotent Payment Ledger](idempotent-payment-ledger/)
+
+A retry-safe payment and double-entry ledger module with PostgreSQL-authoritative state,
+optional owner-scoped Redis reservations, concurrent-writer recovery, overdraft protection,
+post-commit cache recovery, and migration upgrade safety.
+
+Its 32-test suite runs against PostgreSQL 16 and Redis 7 through Testcontainers. The public
+review surface includes design and failure-mode documents, two ADRs, an operations runbook,
+and an evidence gate. Deferred capabilities are stated explicitly in the module rather than
+presented as implemented behavior.

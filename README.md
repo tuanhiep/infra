@@ -1,78 +1,139 @@
 # Infra
 
-Executable architecture case studies for backend infrastructure, distributed systems mechanics, and engineering judgment under failure.
+Executable architecture case studies for backend infrastructure, distributed systems,
+and engineering judgment under failure.
 
-This repository is built around a simple standard: every architectural claim should be backed by running code, tests, configuration, or an explicit production gap. It is not a pattern catalog. It is a small set of modules designed to make invariants, trade-offs, and failure behavior inspectable.
+Every material claim in this repository is expected to map to running code, an executable
+test, an operational procedure, or an explicitly documented limitation.
 
-## What This Repo Optimizes For
+## Featured Case Study
 
-- Correctness boundaries that are named in the design and encoded in tests.
-- Failure modes written before they become hidden assumptions.
-- Runnable modules, not slide-only system design.
-- Operational signals such as health, metrics, cache status, and degradation state where the module needs them.
-- Production gaps stated plainly so the demo does not pretend to be a finished platform.
+### Idempotent Payment Ledger
 
-## Current Tracks
+[Explore the module](system-design/idempotent-payment-ledger/) | [Design](system-design/idempotent-payment-ledger/docs/DESIGN_DOC.md) | [Failure modes](system-design/idempotent-payment-ledger/docs/FAILURE_MODES.md) | [Operations runbook](system-design/idempotent-payment-ledger/docs/OPERATIONS_RUNBOOK.md)
+
+A completed v1 case study for retry-safe payment intake and double-entry ledger mutation.
+It addresses a difficult boundary in payment systems: a client can time out without knowing
+whether the server committed, then retry while another request or application instance is
+still processing the same logical payment.
+
+The core invariant is:
 
 ```text
-infra/
-  brick/
-    cdn-edge-cache/
-    circuit-breaker/
-    rate-limiter/
-  system-design/
-    idempotent-payment-ledger/
-    llm-backpressure-lab/
-  principal-engineering/
-    README.md
+One logical payment attempt maps to one accepted payment outcome and one balanced
+ledger transaction, regardless of client retries or concurrent delivery.
 ```
 
-### `brick/`
+#### System Shape
 
-Small, reusable infrastructure primitives. A brick should be independently understandable, testable, and useful as a building block for larger system design modules.
+```mermaid
+flowchart LR
+    client[Client] --> api[Payment API]
+    api --> service[PaymentIntakeService]
+    service --> boundary{Idempotency boundary}
+    boundary -->|JPA mode| idb[(PostgreSQL idempotency)]
+    boundary -->|Hybrid mode| redis[(Owner-scoped Redis lease)]
+    idb --> ledger[Transactional ledger write]
+    redis --> ledger
+    ledger --> postgres[(PostgreSQL source of truth)]
+    postgres --> replay[DB look-and-replay]
+    postgres --> afterCommit[Owner-safe cache completion]
+```
 
-| Module | Focus | Current maturity |
-|---|---|---|
-| `brick/cdn-edge-cache` | Spring Boot Origin plus Nginx Edge cache, cache policy, WAF sample, rate limiting, HIT/MISS observability | Strong runnable brick; Dockerized Edge exists; remaining work is deeper runtime evidence, cache security hardening, and production observability. |
-| `brick/circuit-breaker` | Resilience4j CircuitBreaker around a real HTTP client, typed failure taxonomy, ordered fallback, Actuator/Micrometer/Prometheus signals | Strongest brick; good correctness and observability surface; remaining work is bulkhead isolation, retry policy decision, runbook, and dashboard. |
-| `brick/rate-limiter` | Per-client token bucket, immediate rejection, rate-limit headers, Actuator metrics | Solid foundational brick; remaining work is concurrency/load evidence, `Retry-After`, monotonic-clock handling, and distributed quota design. |
+PostgreSQL is authoritative in both runtime modes. Redis is an optional perimeter that
+reduces duplicate pressure; it never replaces database uniqueness or transaction safety.
 
-### `system-design/`
+#### What Is Implemented
 
-Runnable case studies that combine multiple infrastructure concerns into a coherent system with requirements, failure analysis, and a path toward production hardening.
+| Engineering concern | Implemented boundary |
+|---|---|
+| Retry ambiguity | Stable idempotency keys bind one accepted payload and replay the stored outcome. |
+| Concurrent duplicate delivery | PostgreSQL uniqueness on `(tenant_id, idempotency_key)` resolves competing writers to one payment and one replay. |
+| Expiring distributed reservations | Redis leases carry random owner tokens; Lua compare-and-set/delete prevents a stale owner from mutating a replacement lease. |
+| Double spending | Payer and merchant accounts are locked in deterministic order with `SELECT FOR UPDATE`; overdraft is rejected and reinforced by a non-negative balance constraint. |
+| Ledger correctness | Payment, account mutation, ledger transaction, and balanced debit/credit entries commit under one PostgreSQL transaction. |
+| Cache failure after commit | Redis completion runs after database commit; PostgreSQL look-and-replay reconstructs a missing cache outcome. |
+| Migration safety | Flyway V3 uniqueness rollout has a pre-flight procedure; V4 cleanup preserves accounts referenced by historical ledger entries. |
+| Operations | Domain metrics, failure-mode analysis, reconciliation queries, rollout guidance, and owner-safe intervention procedures are documented. |
 
-| Module | Focus | Current maturity |
-|---|---|---|
-| `system-design/idempotent-payment-ledger` | Retry-safe payment intake, idempotency keys, payload hashing, duplicate replay, conflict detection, balanced debit/credit ledger entries | Strong first slice; correctness invariants are clear and tested; next serious step is durable transaction boundary with Postgres-style persistence, ledger posting rules, outbox, reconciliation, and domain metrics. |
-| `system-design/llm-backpressure-lab` | Local lab for isolating slow/flaky LLM dependencies with a Mock LLM, planned async outbox/Kafka workers, DLQ, backpressure, and before/after load evidence | New first slice; proof contract, Mock LLM, tests, and Docker skeleton exist; remaining work is core API, Kafka worker path, k6, Prometheus/Grafana, ADRs, and before/after evidence. |
+#### Failure Evidence
 
-### `principal-engineering/`
+The module exercises failure paths against PostgreSQL 16 and Redis 7 through Testcontainers,
+without an H2 fallback.
 
-Architecture review and operating-judgment material. This track is intentionally present but not yet mature: it should grow only when there are real modules, trade-offs, incidents, rollout plans, or red-team reviews worth capturing.
+| Scenario under test | Expected evidence |
+|---|---|
+| Two database writers race on the same key | One durable payment; the loser returns the winner as a replay. |
+| Ten concurrent debits exceed the available balance | Exactly the affordable payments commit; the account never becomes negative. |
+| Database transaction rolls back | Redis is never published as `ACCEPTED`. |
+| Database commits but Redis completion fails | The durable payment survives and the next retry repairs the cache through DB replay. |
+| A Redis lease expires and a new owner acquires it | The stale owner can neither delete nor complete over the replacement owner. |
+| V4 runs over a V3 database with ledger history | Referenced accounts survive; only unused fixture accounts are removed. |
 
-## Evidence Gates
+Current verification:
 
-Each serious module should carry the same public evidence surface:
+```text
+Module suite: 32 tests, 0 failures, 0 errors, 0 skipped
+Full Maven reactor: pass
+Docker Compose validation: pass
+```
 
-- `README.md`: problem, invariants, runtime flow, commands, test matrix, production gaps.
-- `docs/DESIGN_DOC.md`: goals, non-goals, architecture, consistency model, alternatives, trade-offs.
-- `docs/FAILURE_MODES.md`: concrete failure scenarios, impact, detection, mitigation, and current evidence.
-- `docs/ARCHITECT_NOTES.md`: design pressure points and review notes.
-- `docs/ENGINEERING_NARRATIVE.md`: how to explain the module without hiding the hard parts.
-- `GATE_CHECKLIST.md`: remaining work across correctness, architecture, implementation, operations, failure, scale, security, and narrative.
+#### Review Surface
 
-The gate is not "does it compile?" The gate is whether a serious reviewer can trace the path from invariant -> code -> test -> operational behavior -> known limitation.
+- [Module README](system-design/idempotent-payment-ledger/README.md): invariants, runtime profiles, commands, test matrix, and explicit gaps.
+- [Design document](system-design/idempotent-payment-ledger/docs/DESIGN_DOC.md): consistency model, transaction boundaries, alternatives, and trade-offs.
+- [ADR-001](system-design/idempotent-payment-ledger/docs/ADR-001-persistence-schema.md): PostgreSQL persistence and authoritative correctness boundary.
+- [ADR-002](system-design/idempotent-payment-ledger/docs/ADR-002-redis-reservation-ownership.md): owner-scoped leases and atomic Redis transitions.
+- [Failure modes](system-design/idempotent-payment-ledger/docs/FAILURE_MODES.md): expected behavior paired with executable evidence.
+- [Operations runbook](system-design/idempotent-payment-ledger/docs/OPERATIONS_RUNBOOK.md): diagnosis, reconciliation, migration rollout, and safe intervention.
+- [Gate checklist](system-design/idempotent-payment-ledger/GATE_CHECKLIST.md): completed evidence and intentionally deferred scope.
+
+The v1 closure boundary is explicit. Transactional outbox delivery, authentication and
+tenant isolation, measured capacity, and a durable reconciliation worker are deferred
+extensions rather than implied capabilities.
+
+## Infrastructure Bricks
+
+Smaller runnable modules isolate reusable mechanics that support larger designs:
+
+| Module | Implemented focus |
+|---|---|
+| [`brick/cdn-edge-cache`](brick/cdn-edge-cache/) | Spring Boot origin with an Nginx edge, cache policy, WAF sample, rate limiting, and HIT/MISS signals. |
+| [`brick/circuit-breaker`](brick/circuit-breaker/) | Resilience4j around a real HTTP client, typed failure classification, ordered fallback, and Actuator/Micrometer signals. |
+| [`brick/rate-limiter`](brick/rate-limiter/) | Per-client token bucket admission, immediate rejection, rate-limit headers, and Actuator metrics. |
+
+## Engineering Standard
+
+A module is useful only when a reviewer can trace:
+
+```text
+invariant -> boundary -> implementation -> executable failure proof
+          -> operational response -> residual risk
+```
+
+The public evidence surface is selected according to the module's risk:
+
+- `README.md` for the problem, guarantees, commands, evidence, and gaps;
+- `docs/DESIGN_DOC.md` for requirements, consistency, alternatives, and trade-offs;
+- ADRs for decisions that should remain stable and reviewable;
+- `docs/FAILURE_MODES.md` for concrete failure scenarios and current proof;
+- `docs/OPERATIONS_RUNBOOK.md` when safe operation requires explicit procedures;
+- `GATE_CHECKLIST.md` for evidence status and deferred scope.
 
 ## Stack
 
 - Java 21
 - Spring Boot 4.0.6
 - Maven Wrapper 3.9.9
-- Maven multi-module project with dependency and plugin governance in the root POM
-- Resilience4j, Micrometer, Actuator, Prometheus export where relevant
-- Nginx and Docker Compose for the CDN Edge cache brick
+- PostgreSQL 16 and Flyway
+- Redis 7
+- Testcontainers
+- Resilience4j, Micrometer, Actuator, and Prometheus export where relevant
+- Docker Compose and Nginx where the runtime topology requires them
 
 ## Build
+
+Docker must be running because persistence tests use real PostgreSQL and Redis containers.
 
 Run the full reactor:
 
@@ -80,51 +141,11 @@ Run the full reactor:
 ./mvnw clean test
 ```
 
-Run one module:
+Run the featured module:
 
 ```bash
-./mvnw -pl brick/circuit-breaker test
-./mvnw -pl brick/rate-limiter test
-./mvnw -pl brick/cdn-edge-cache test
-./mvnw -pl system-design/idempotent-payment-ledger test
+./mvnw -pl system-design/idempotent-payment-ledger clean test
 ```
 
-Run a Spring Boot module locally:
-
-```bash
-./mvnw -pl brick/circuit-breaker spring-boot:run
-```
-
-For the CDN Edge cache, build the Origin and run the Edge pair:
-
-```bash
-./mvnw -pl brick/cdn-edge-cache package
-cd brick/cdn-edge-cache
-docker compose up --build
-```
-
-## Engineering Bar
-
-This repo is useful only if the modules stay honest. A module should not be treated as mature until it can answer:
-
-- What invariant does this protect?
-- What failure mode does it intentionally handle?
-- What failure mode does it explicitly not handle yet?
-- What is the source of truth?
-- What is the transaction or consistency boundary?
-- What signal would tell an operator this pattern is failing in production?
-- What would change when the system moves from one instance to many?
-
-## Current Read
-
-The repository is past toy-demo level in several modules because the code, tests, and docs already describe real boundaries: retry safety, fallback classification, edge/origin split, token-bucket admission, and balanced ledger mutation.
-
-It is not yet a complete production-grade platform. The next level is less about adding modules and more about hardening the most valuable ones:
-
-1. Make `idempotent-payment-ledger` durable with transactional persistence, posting rules, outbox, reconciliation, and metrics.
-2. Turn `rate-limiter` into a real quota-control-plane slice with distributed counters and policy ownership.
-3. Add bulkheads, alert rules, dashboards, and runbooks to `circuit-breaker`.
-4. Close CDN cache security/observability gaps and prove runtime Edge behavior beyond Origin header tests.
-5. Grow `principal-engineering/` from real review packets, incident drills, rollout plans, and design decision records.
-
-The intended direction is narrow and deep: fewer modules, stronger invariants, better failure evidence.
+Runtime profiles and local seed instructions are documented in the
+[module README](system-design/idempotent-payment-ledger/README.md).
