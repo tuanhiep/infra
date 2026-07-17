@@ -2,7 +2,7 @@
 
 ## Ownership
 
-This module is owned by the Principal Engineer. AI agents (Claude, Codex, Gemini) assist with implementation and review but do not own architectural decisions.
+Architecture decisions and public claims are owned by the repository maintainer. Implementation and review tools do not replace engineering judgment or evidence.
 
 ## Design Intent
 
